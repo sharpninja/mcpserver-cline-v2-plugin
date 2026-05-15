@@ -1,0 +1,83 @@
+{
+  "name": "@sharpninja/mcpserver-cline-v2-plugin",
+  "version": "0.1.0",
+  "description": "Cline V2 AgentPlugin for McpServer TODO, session-log, requirements, GraphRAG, workspace initialization, and failsafe replay workflows.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "cline": {
+    "plugins": [
+      {
+        "paths": [
+          "./dist/index.js"
+        ],
+        "capabilities": [
+          "tools",
+          "hooks"
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "files": [
+    "dist/",
+    "lib/",
+    "skills/",
+    "ENFORCEMENT.md",
+    "README.md"
+  ],
+  "keywords": [
+    "mcp",
+    "cline",
+    "cline-plugin",
+    "agentplugin",
+    "mcpserver",
+    "todo",
+    "session-log",
+    "requirements",
+    "graphrag",
+    "ai-tools"
+  ],
+  "author": {
+    "name": "Payton Byrd (The Sharp Ninja)",
+    "url": "https://github.com/sharpninja"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/sharpninja/mcpserver-cline-v2-plugin",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sharpninja/mcpserver-cline-v2-plugin.git"
+  },
+  "dependencies": {
+    "@cline/core": "0.0.41",
+    "@cline/sdk": "0.0.41",
+    "js-yaml": "^4.1.0"
+  },
+  "peerDependencies": {
+    "@cline/core": "^0.0.41",
+    "@cline/sdk": "^0.0.41"
+  },
+  "devDependencies": {
+    "@cline/sdk": "0.0.41",
+    "@types/jest": "^29.5.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
