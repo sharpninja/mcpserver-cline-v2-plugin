@@ -1,6 +1,6 @@
 node_modules/
 dist/
-cache/
+/cache/
 .mcpServer/failsafe/
 *.js.map
 *.d.ts.map
@@ -9,4 +9,3 @@ cache/
 AGENTS-README-FIRST.yaml
 .mcpServer/
 mcp.db
-

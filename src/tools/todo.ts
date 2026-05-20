@@ -1,6 +1,8 @@
 import type { ToolDescriptor as Tool } from '../tool-descriptor.js';
 import type { ReplBridge, ReplResponse } from '../transport/repl-bridge.js';
 import { cacheDelete, cacheWrite } from '../cache/cache-manager.js';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export const todoTools: Tool[] = [
   {
@@ -151,6 +153,41 @@ export const todoTools: Tool[] = [
       required: ['id'],
     },
   },
+  {
+    name: 'todo_internal_status',
+    description: 'Report whether MCP TODOs are enabled as the backing store for internal agent TODO tracking.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'todo_internal_enable',
+    description: 'Enable MCP-backed internal agent TODO tracking for this plugin cache.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'todo_internal_disable',
+    description: 'Disable MCP-backed internal agent TODO tracking for this plugin cache.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'todo_internal_tracking',
+    description: 'Set or inspect MCP-backed internal agent TODO tracking with an explicit enabled/mode value.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        enabled: { type: ['boolean', 'string'], description: 'Enable or disable MCP-backed internal TODO tracking' },
+        mode: { type: 'string', description: 'Alias for enabled; accepts on/off, true/false, mcp/local' },
+      },
+    },
+  },
 ];
 
 const toolMethodMap: Record<string, string> = {
@@ -168,9 +205,101 @@ const toolMethodMap: Record<string, string> = {
 };
 
 const mutatingTodoTools = new Set(['todo_create', 'todo_update', 'todo_update_selected', 'todo_delete']);
+const internalTodoTools = new Set([
+  'todo_internal_status',
+  'todo_internal_enable',
+  'todo_internal_disable',
+  'todo_internal_tracking',
+]);
 
 export function canHandleTodoTool(name: string): boolean {
-  return name in toolMethodMap;
+  return name in toolMethodMap || internalTodoTools.has(name);
+}
+
+function boolToEnabled(value: unknown): boolean | undefined {
+  if (typeof value === 'boolean') return value;
+  if (typeof value !== 'string') return undefined;
+
+  const normalized = value.trim().replace(/^["'](.*)["']$/, '$1').toLowerCase();
+  if (['1', 'true', 'yes', 'on', 'enabled', 'enable', 'mcp', 'mcpserver'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off', 'disabled', 'disable', 'codex', 'local'].includes(normalized)) return false;
+  return undefined;
+}
+
+function internalTodoCacheDir(): string {
+  return (
+    process.env.MCPSERVER_PLUGIN_CACHE_DIR ||
+    process.env.MCP_PLUGIN_CACHE_DIR ||
+    process.env.MCPSERVER_CACHE_DIR ||
+    process.env.MCP_CACHE_DIR ||
+    path.join(
+      process.env.MCPSERVER_WORKSPACE_PATH || process.env.MCP_WORKSPACE_PATH || process.cwd(),
+      '.mcpServer',
+      'cline-v2-plugin',
+    )
+  );
+}
+
+function internalTodoStateFile(): string {
+  return process.env.MCPSERVER_INTERNAL_TODO_STATE_FILE || path.join(internalTodoCacheDir(), 'internal-todo.yaml');
+}
+
+function internalTodoModeValue(): { enabled: boolean; source: 'environment' | 'cache' | 'default'; stateFile: string } {
+  const stateFile = internalTodoStateFile();
+  const envValue =
+    process.env.MCP_CODEX_INTERNAL_TODO ?? process.env.MCPSERVER_CODEX_INTERNAL_TODO ?? process.env.CODEX_MCP_TODO;
+  const envMode = boolToEnabled(envValue);
+  if (envMode !== undefined) return { enabled: envMode, source: 'environment', stateFile };
+
+  if (fs.existsSync(stateFile)) {
+    const text = fs.readFileSync(stateFile, 'utf8');
+    const match = text.match(/^enabled:\s*(.+?)\s*$/m);
+    const fileMode = boolToEnabled(match?.[1]);
+    if (fileMode !== undefined) return { enabled: fileMode, source: 'cache', stateFile };
+  }
+
+  return { enabled: false, source: 'default', stateFile };
+}
+
+function setInternalTodoMode(enabled: boolean): void {
+  const stateFile = internalTodoStateFile();
+  fs.mkdirSync(path.dirname(stateFile), { recursive: true });
+  fs.writeFileSync(stateFile, `enabled: ${enabled}\nupdatedAt: ${new Date().toISOString()}\n`, 'utf8');
+}
+
+function requestedInternalTodoMode(args: Record<string, unknown>): boolean | undefined {
+  const source = unwrapRequest(args);
+  return (
+    boolToEnabled(source.enabled) ??
+    boolToEnabled(source.mode) ??
+    boolToEnabled(source.mcpTodo) ??
+    boolToEnabled(source.mcpBacked)
+  );
+}
+
+async function handleInternalTodoTool(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
+  switch (name) {
+    case 'todo_internal_enable':
+      setInternalTodoMode(true);
+      break;
+    case 'todo_internal_disable':
+      setInternalTodoMode(false);
+      break;
+    case 'todo_internal_tracking': {
+      const requested = requestedInternalTodoMode(args);
+      if (requested === undefined && Object.keys(unwrapRequest(args)).length > 0) {
+        throw new Error('internal TODO tracking mode must be enabled/disabled or true/false');
+      }
+      if (requested !== undefined) setInternalTodoMode(requested);
+      break;
+    }
+    case 'todo_internal_status':
+      break;
+    default:
+      throw new Error(`Unknown internal todo tool: ${name}`);
+  }
+
+  return { result: internalTodoModeValue() };
 }
 
 function stringArg(args: Record<string, unknown>, ...keys: string[]): string {
@@ -396,6 +525,8 @@ export async function handleTodoTool(
   args: Record<string, unknown>,
   bridge: ReplBridge,
 ) {
+  if (internalTodoTools.has(name)) return handleInternalTodoTool(name, args);
+
   const method = toolMethodMap[name];
   if (!method) throw new Error(`Unknown todo tool: ${name}`);
 

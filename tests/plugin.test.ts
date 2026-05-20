@@ -52,6 +52,8 @@ describe('Cline V2 AgentPlugin contract', () => {
     expect(names).toEqual(expect.arrayContaining([
       'workspace_ensure',
       'todo_query',
+      'todo_internal_status',
+      'todo_internal_enable',
       'session_query_history',
       'req_generate_document',
       'graphrag_query',

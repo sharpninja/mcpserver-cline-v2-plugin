@@ -23,6 +23,81 @@ function restoreEnv(key: string, value: string | undefined): void {
   else process.env[key] = value;
 }
 
+describe('handleTodoTool internal TODO tracking toggle', () => {
+  const envKeys = [
+    'MCP_CODEX_INTERNAL_TODO',
+    'MCPSERVER_CODEX_INTERNAL_TODO',
+    'CODEX_MCP_TODO',
+    'MCPSERVER_PLUGIN_CACHE_DIR',
+    'MCP_PLUGIN_CACHE_DIR',
+    'MCPSERVER_INTERNAL_TODO_STATE_FILE',
+  ];
+  let oldEnv: Record<string, string | undefined>;
+  let cacheDir: string;
+
+  beforeEach(() => {
+    oldEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+    for (const key of envKeys) delete process.env[key];
+    cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cline-internal-todo-'));
+    process.env.MCPSERVER_PLUGIN_CACHE_DIR = cacheDir;
+  });
+
+  afterEach(() => {
+    for (const key of envKeys) restoreEnv(key, oldEnv[key]);
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+  });
+
+  test('defaults to local internal tracking without calling the bridge', async () => {
+    const fake = new FakeBridge();
+
+    const result = await handleTodoTool('todo_internal_status', {}, asBridge(fake));
+
+    expect(result.result).toEqual({
+      enabled: false,
+      source: 'default',
+      stateFile: path.join(cacheDir, 'internal-todo.yaml'),
+    });
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  test('enable, status, and disable persist the cached mode', async () => {
+    const fake = new FakeBridge();
+
+    const enabled = await handleTodoTool('todo_internal_enable', {}, asBridge(fake));
+    expect(enabled.result).toMatchObject({ enabled: true, source: 'cache' });
+    expect(fs.readFileSync(path.join(cacheDir, 'internal-todo.yaml'), 'utf8')).toContain('enabled: true');
+
+    const status = await handleTodoTool('todo_internal_status', {}, asBridge(fake));
+    expect(status.result).toMatchObject({ enabled: true, source: 'cache' });
+
+    const disabled = await handleTodoTool('todo_internal_disable', {}, asBridge(fake));
+    expect(disabled.result).toMatchObject({ enabled: false, source: 'cache' });
+    expect(fs.readFileSync(path.join(cacheDir, 'internal-todo.yaml'), 'utf8')).toContain('enabled: false');
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  test('environment override wins over cached mode', async () => {
+    const fake = new FakeBridge();
+
+    await handleTodoTool('todo_internal_disable', {}, asBridge(fake));
+    process.env.MCP_CODEX_INTERNAL_TODO = 'on';
+
+    const result = await handleTodoTool('todo_internal_status', {}, asBridge(fake));
+
+    expect(result.result).toMatchObject({ enabled: true, source: 'environment' });
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  test('generic tracking tool accepts explicit mode aliases', async () => {
+    const fake = new FakeBridge();
+
+    const result = await handleTodoTool('todo_internal_tracking', { mode: 'mcp' }, asBridge(fake));
+
+    expect(result.result).toMatchObject({ enabled: true, source: 'cache' });
+    expect(fake.calls).toHaveLength(0);
+  });
+});
+
 describe('handleTodoTool failsafe cache', () => {
   test('keeps local failsafe when todo_create returns an error', async () => {
     const fake = new FakeBridge();
