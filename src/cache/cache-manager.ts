@@ -4,6 +4,8 @@ import * as path from 'path';
 import yaml from 'js-yaml';
 import type { ReplBridge } from '../transport/repl-bridge.js';
 
+const MAX_RETRIES = 3;
+
 interface FailsafeEntry {
   id: string;
   timestamp: string;
@@ -16,12 +18,30 @@ function sanitize(value: string): string {
   return value.replace(/[^a-zA-Z0-9._=-]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'operation';
 }
 
+/**
+ * Returns Base64URL encoding of workspacePath, matching V4CacheManager.GetScopedCachePath
+ * in @sharpninja/mcpserver-agent-core (TR-MCP-AGENT-PARITY-013).
+ */
+function getWorkspaceKeyV4(workspacePath: string): string {
+  return Buffer.from(workspacePath)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
 function failsafeDir(): string {
-  return (
-    process.env.MCPSERVER_FAILSAFE_DIR ||
-    process.env.MCP_FAILSAFE_DIR ||
-    path.join(os.tmpdir(), 'mcpserver-cline-v2-plugin', 'failsafe')
-  );
+  if (process.env.MCPSERVER_FAILSAFE_DIR || process.env.MCP_FAILSAFE_DIR) {
+    return process.env.MCPSERVER_FAILSAFE_DIR || process.env.MCP_FAILSAFE_DIR!;
+  }
+
+  const workspacePath = process.env.MCPSERVER_WORKSPACE_PATH ?? process.env.MCP_WORKSPACE_PATH;
+  if (workspacePath) {
+    const key = getWorkspaceKeyV4(workspacePath);
+    return path.join(workspacePath, '.mcpServer', 'failsafe', 'cline-v2', 'workspaces', key);
+  }
+
+  return path.join(os.tmpdir(), 'mcpserver-cline-v2-plugin', 'failsafe');
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

@@ -1,4 +1,7 @@
-# Per-Turn Enforcement Protocol (Cline)
+# Per-Turn Enforcement Protocol (Cline v2) - v4 Shared Protocol
+
+This plugin implements the McpServer **v4 Shared Enforcement Protocol** for Cline v2 agent sessions.
+See `packages/mcpserver-agent-core` (`@sharpninja/mcpserver-agent-core`) for the shared core reference.
 
 Cline consumes this plugin as an MCP server. The server does not (and cannot)
 intercept Cline's message loop — Cline decides when to call MCP tools. This
