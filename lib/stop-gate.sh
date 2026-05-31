@@ -26,13 +26,14 @@ cat >/dev/null 2>&1 || true
 # a previous block, let this Stop through.
 STOP_HOOK_ACTIVE="${CLAUDE_STOP_HOOK_ACTIVE:-false}"
 if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
-    printf '{"hookSpecificOutput":{"hookEventName":"Stop","status":"already-reprompted"}}\n'
+    # Claude Code's Stop schema rejects hookSpecificOutput with a custom "status" field ("(root): Invalid input"); {} is the canonical allow-pass-through response.
+    printf '{}\n'
     exit 0
 fi
 
 # No turn file = no gate (e.g. MCP was unavailable; no enforcement possible).
 if [ ! -f "$TURN_FILE" ]; then
-    printf '{"hookSpecificOutput":{"hookEventName":"Stop","status":"no-turn"}}\n'
+    printf '{}\n'
     exit 0
 fi
 
@@ -76,5 +77,5 @@ if [ "$CODE_EDITS" -gt 0 ] && [ "$BUILD_STATUS" = "failed" ]; then
 fi
 
 # All gates passed.
-printf '{"hookSpecificOutput":{"hookEventName":"Stop","status":"passed","turnRequestId":"%s"}}\n' "$TURN_ID"
+printf '{}\n'
 exit 0
