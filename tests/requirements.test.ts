@@ -52,6 +52,27 @@ describe('requirements tool schemas', () => {
     expect(schema.properties).toHaveProperty('preferredWikiFormat');
     expect(schema.required).toBeUndefined();
   });
+
+  test('FR/TR/TEST create+update tools expose acceptanceCriteria array schema', () => {
+    const toolNames = [
+      'req_create_fr',
+      'req_update_fr',
+      'req_create_tr',
+      'req_update_tr',
+      'req_create_test',
+      'req_update_test',
+    ];
+    for (const name of toolNames) {
+      const schema = tool(name).inputSchema as unknown as {
+        properties: Record<string, { type?: string; items?: { type?: string; required?: string[] } }>;
+      };
+      const ac = schema.properties.acceptanceCriteria;
+      expect(ac).toBeDefined();
+      expect(ac.type).toBe('array');
+      expect(ac.items?.type).toBe('object');
+      expect(ac.items?.required).toEqual(['text']);
+    }
+  });
 });
 
 describe('handleRequirementsTool', () => {
@@ -207,6 +228,84 @@ describe('handleRequirementsTool', () => {
     ]);
   });
 
+  test('threads acceptanceCriteria into typed create FR request when workflow returns empty', async () => {
+    const fake = new FakeBridge();
+    fake.responses = [
+      { type: 'result', payload: { result: {} } },
+      { type: 'result', payload: { result: { id: 'FR-AC-001' } } },
+    ];
+
+    const acceptanceCriteria = [
+      { text: 'Server returns 200', isSatisfied: false },
+      { id: 'AC-2', text: 'Logs the request', evidence: 'see log line' },
+    ];
+
+    await handleRequirementsTool(
+      'req_create_fr',
+      {
+        id: 'FR-AC-001',
+        title: 'AC FR',
+        description: 'AC body',
+        priority: 'high',
+        area: 'MCP',
+        acceptanceCriteria,
+      },
+      asBridge(fake),
+    );
+
+    expect(fake.calls).toHaveLength(2);
+    expect(fake.calls[1].method).toBe('client.Requirements.CreateFrAsync');
+    const typedParams = fake.calls[1].params as { request: { acceptanceCriteria: unknown } };
+    expect(typedParams.request.acceptanceCriteria).toEqual(acceptanceCriteria);
+  });
+
+  test('threads acceptanceCriteria into typed update TEST request when workflow returns empty', async () => {
+    const fake = new FakeBridge();
+    fake.responses = [
+      { type: 'result', payload: { result: {} } },
+      { type: 'result', payload: { result: { id: 'TEST-AC-001' } } },
+    ];
+
+    const acceptanceCriteria = [{ text: 'Coverage > 80%' }];
+
+    await handleRequirementsTool(
+      'req_update_test',
+      {
+        id: 'TEST-AC-001',
+        description: 'Updated condition',
+        acceptanceCriteria,
+      },
+      asBridge(fake),
+    );
+
+    expect(fake.calls).toHaveLength(2);
+    expect(fake.calls[1].method).toBe('client.Requirements.UpdateTestAsync');
+    const typedParams = fake.calls[1].params as { id: string; request: { acceptanceCriteria: unknown } };
+    expect(typedParams.id).toBe('TEST-AC-001');
+    expect(typedParams.request.acceptanceCriteria).toEqual(acceptanceCriteria);
+  });
+
+
+  test('req_copy_acceptance_criteria_from_todo maps to the workflow method', async () => {
+    const fake = new FakeBridge();
+    fake.nextResponse = {
+      type: 'result',
+      payload: { result: { copied: true } },
+    };
+
+    await handleRequirementsTool(
+      'req_copy_acceptance_criteria_from_todo',
+      { kind: 'fr', id: 'FR-AC-001', todoId: 'PLAN-MCP-001' },
+      asBridge(fake),
+    );
+
+    expect(fake.calls).toEqual([
+      {
+        method: 'workflow.requirements.copyAcceptanceCriteriaFromTodo',
+        params: { kind: 'fr', id: 'FR-AC-001', todoId: 'PLAN-MCP-001' },
+      },
+    ]);
+  });
   test('uses HTTP wiki fallback when typed generate returns empty result', async () => {
     const fake = new FakeBridge();
     fake.responses = [
