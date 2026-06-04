@@ -1,6 +1,7 @@
 import type { ToolDescriptor as Tool } from '../tool-descriptor.js';
 import type { ReplBridge, ReplResponse } from '../transport/repl-bridge.js';
 import { cacheDelete, cacheWrite } from '../cache/cache-manager.js';
+import * as yaml from 'js-yaml';
 
 const STATUS_ENUM = ['pending', 'in_progress', 'completed', 'deferred'] as const;
 const PRIORITY_ENUM = ['critical', 'high', 'medium', 'low'] as const;
@@ -16,6 +17,18 @@ const ACCEPTANCE_CRITERION_SCHEMA = {
   required: ['text'],
 } as const;
 const ACCEPTANCE_CRITERIA_ARRAY = { type: 'array', items: ACCEPTANCE_CRITERION_SCHEMA } as const;
+const BATCH_INPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    records: {
+      oneOf: [
+        { type: 'array', minItems: 1, items: { type: 'object' } },
+        { type: 'string', minLength: 1 },
+      ],
+    },
+  },
+  required: ['records'],
+} as const;
 
 export const requirementsTools: Tool[] = [
   // --- Functional Requirements ---
@@ -192,6 +205,46 @@ export const requirementsTools: Tool[] = [
       required: ['id'],
     },
   },
+  {
+    name: 'req_create_fr_batch',
+    description: 'Create multiple workspace-scoped functional requirements atomically from a records array.',
+    inputSchema: BATCH_INPUT_SCHEMA,
+  },
+  {
+    name: 'req_update_fr_batch',
+    description: 'Update multiple workspace-scoped functional requirements atomically from a records array.',
+    inputSchema: BATCH_INPUT_SCHEMA,
+  },
+  {
+    name: 'req_create_tr_batch',
+    description: 'Create multiple workspace-scoped technical requirements atomically from a records array.',
+    inputSchema: BATCH_INPUT_SCHEMA,
+  },
+  {
+    name: 'req_update_tr_batch',
+    description: 'Update multiple workspace-scoped technical requirements atomically from a records array.',
+    inputSchema: BATCH_INPUT_SCHEMA,
+  },
+  {
+    name: 'req_create_test_batch',
+    description: 'Create multiple workspace-scoped test requirements atomically from a records array.',
+    inputSchema: BATCH_INPUT_SCHEMA,
+  },
+  {
+    name: 'req_update_test_batch',
+    description: 'Update multiple workspace-scoped test requirements atomically from a records array.',
+    inputSchema: BATCH_INPUT_SCHEMA,
+  },
+  {
+    name: 'req_create_batch',
+    description: 'Create mixed FR/TR/TEST requirements atomically from a records array.',
+    inputSchema: BATCH_INPUT_SCHEMA,
+  },
+  {
+    name: 'req_update_batch',
+    description: 'Update mixed FR/TR/TEST requirements atomically from a records array.',
+    inputSchema: BATCH_INPUT_SCHEMA,
+  },
   // --- Mappings ---
   {
     name: 'req_copy_acceptance_criteria_from_todo',
@@ -314,16 +367,24 @@ const workflowMethodMap: Record<string, string> = {
   req_list_fr: 'workflow.requirements.listFr',
   req_get_fr: 'workflow.requirements.getFr',
   req_create_fr: 'workflow.requirements.createFr',
+  req_create_fr_batch: 'workflow.requirements.createFrBatch',
   req_update_fr: 'workflow.requirements.updateFr',
+  req_update_fr_batch: 'workflow.requirements.updateFrBatch',
   req_delete_fr: 'workflow.requirements.deleteFr',
   req_list_tr: 'workflow.requirements.listTr',
   req_create_tr: 'workflow.requirements.createTr',
+  req_create_tr_batch: 'workflow.requirements.createTrBatch',
   req_update_tr: 'workflow.requirements.updateTr',
+  req_update_tr_batch: 'workflow.requirements.updateTrBatch',
   req_delete_tr: 'workflow.requirements.deleteTr',
   req_list_test: 'workflow.requirements.listTest',
   req_create_test: 'workflow.requirements.createTest',
+  req_create_test_batch: 'workflow.requirements.createTestBatch',
   req_update_test: 'workflow.requirements.updateTest',
+  req_update_test_batch: 'workflow.requirements.updateTestBatch',
   req_delete_test: 'workflow.requirements.deleteTest',
+  req_create_batch: 'workflow.requirements.createBatch',
+  req_update_batch: 'workflow.requirements.updateBatch',
   req_copy_acceptance_criteria_from_todo: 'workflow.requirements.copyAcceptanceCriteriaFromTodo',
   req_list_mappings: 'workflow.requirements.listMappings',
   req_create_mapping: 'workflow.requirements.createMapping',
@@ -336,16 +397,24 @@ const typedMethodMap: Record<string, string> = {
   req_list_fr: 'client.Requirements.ListFrAsync',
   req_get_fr: 'client.Requirements.GetFrAsync',
   req_create_fr: 'client.Requirements.CreateFrAsync',
+  req_create_fr_batch: 'client.Requirements.CreateFrBatchAsync',
   req_update_fr: 'client.Requirements.UpdateFrAsync',
+  req_update_fr_batch: 'client.Requirements.UpdateFrBatchAsync',
   req_delete_fr: 'client.Requirements.DeleteFrAsync',
   req_list_tr: 'client.Requirements.ListTrAsync',
   req_create_tr: 'client.Requirements.CreateTrAsync',
+  req_create_tr_batch: 'client.Requirements.CreateTrBatchAsync',
   req_update_tr: 'client.Requirements.UpdateTrAsync',
+  req_update_tr_batch: 'client.Requirements.UpdateTrBatchAsync',
   req_delete_tr: 'client.Requirements.DeleteTrAsync',
   req_list_test: 'client.Requirements.ListTestAsync',
   req_create_test: 'client.Requirements.CreateTestAsync',
+  req_create_test_batch: 'client.Requirements.CreateTestBatchAsync',
   req_update_test: 'client.Requirements.UpdateTestAsync',
+  req_update_test_batch: 'client.Requirements.UpdateTestBatchAsync',
   req_delete_test: 'client.Requirements.DeleteTestAsync',
+  req_create_batch: 'client.Requirements.CreateBatchAsync',
+  req_update_batch: 'client.Requirements.UpdateBatchAsync',
   req_list_mappings: 'client.Requirements.ListMappingsAsync',
   req_create_mapping: 'client.Requirements.UpsertMappingAsync',
   req_delete_mapping: 'client.Requirements.DeleteMappingAsync',
@@ -355,16 +424,35 @@ const typedMethodMap: Record<string, string> = {
 
 const workflowOnlyRequirementsTools = new Set(['req_copy_acceptance_criteria_from_todo']);
 
+const batchRequirementsTools = new Set([
+  'req_create_fr_batch',
+  'req_update_fr_batch',
+  'req_create_tr_batch',
+  'req_update_tr_batch',
+  'req_create_test_batch',
+  'req_update_test_batch',
+  'req_create_batch',
+  'req_update_batch',
+]);
+
 const mutatingRequirementsTools = new Set([
   'req_create_fr',
+  'req_create_fr_batch',
   'req_update_fr',
+  'req_update_fr_batch',
   'req_delete_fr',
   'req_create_tr',
+  'req_create_tr_batch',
   'req_update_tr',
+  'req_update_tr_batch',
   'req_delete_tr',
   'req_create_test',
+  'req_create_test_batch',
   'req_update_test',
+  'req_update_test_batch',
   'req_delete_test',
+  'req_create_batch',
+  'req_update_batch',
   'req_copy_acceptance_criteria_from_todo',
   'req_create_mapping',
   'req_delete_mapping',
@@ -436,6 +524,36 @@ function requestParam(request: Record<string, unknown>): Record<string, unknown>
   return { request };
 }
 
+function parseRecordsValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string' || value.trim().length === 0) return value;
+
+  let parsed: unknown;
+  try {
+    parsed = yaml.load(value);
+  } catch {
+    return value;
+  }
+
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const records = (parsed as { records?: unknown }).records;
+    if (Array.isArray(records)) return records;
+  }
+
+  return value;
+}
+
+function normalizeRequirementArgs(name: string, args: Record<string, unknown>): Record<string, unknown> {
+  if (!batchRequirementsTools.has(name)) return args;
+  const records = parseRecordsValue(args.records);
+  return records === args.records ? args : { ...args, records };
+}
+
+function batchRequestParam(args: Record<string, unknown>): Record<string, unknown> {
+  return requestParam({ records: Array.isArray(args.records) ? args.records : [] });
+}
+
 function listParam(
   args: Record<string, unknown>,
   pluralKey: string,
@@ -462,6 +580,16 @@ function typedParams(name: string, args: Record<string, unknown>): Record<string
     case 'req_delete_tr':
     case 'req_delete_test':
       return idParam(args);
+
+    case 'req_create_fr_batch':
+    case 'req_update_fr_batch':
+    case 'req_create_tr_batch':
+    case 'req_update_tr_batch':
+    case 'req_create_test_batch':
+    case 'req_update_test_batch':
+    case 'req_create_batch':
+    case 'req_update_batch':
+      return batchRequestParam(args);
 
     case 'req_create_fr':
     case 'req_create_tr':
@@ -712,10 +840,11 @@ export async function handleRequirementsTool(
   bridge: ReplBridge,
 ) {
   const method = workflowMethodMap[name];
-  const failsafePath = mutatingRequirementsTools.has(name) && method ? await cacheWrite(method, args) : undefined;
+  const normalizedArgs = normalizeRequirementArgs(name, args);
+  const failsafePath = mutatingRequirementsTools.has(name) && method ? await cacheWrite(method, normalizedArgs) : undefined;
   let response: ReplResponse;
   try {
-    response = await invokeRequirementsTool(name, args, bridge);
+    response = await invokeRequirementsTool(name, normalizedArgs, bridge);
   } catch (error) {
     const suffix = failsafePath ? ` Local failsafe saved: ${failsafePath}` : '';
     throw new Error(`${error instanceof Error ? error.message : String(error)}${suffix}`);
