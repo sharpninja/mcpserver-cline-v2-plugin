@@ -460,6 +460,15 @@ const mutatingRequirementsTools = new Set([
   'req_ingest_document',
 ]);
 
+const acceptanceCriteriaMutationTools = new Set([
+  'req_create_fr',
+  'req_update_fr',
+  'req_create_tr',
+  'req_update_tr',
+  'req_create_test',
+  'req_update_test',
+]);
+
 export function canHandleRequirementsTool(name: string): boolean {
   return name in workflowMethodMap;
 }
@@ -687,6 +696,41 @@ function isEmptyResult(response: ReplResponse): boolean {
   );
 }
 
+function hasSuppliedAcceptanceCriteria(name: string, args: Record<string, unknown>): boolean {
+  return acceptanceCriteriaMutationTools.has(name) && Array.isArray(args.acceptanceCriteria);
+}
+
+function valueHasExplicitEmptyAcceptanceCriteria(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.some(valueHasExplicitEmptyAcceptanceCriteria);
+
+  const record = value as Record<string, unknown>;
+  if (
+    Object.prototype.hasOwnProperty.call(record, 'acceptanceCriteria') &&
+    Array.isArray(record.acceptanceCriteria) &&
+    record.acceptanceCriteria.length === 0
+  ) {
+    return true;
+  }
+
+  return ['result', 'item', 'data', 'requirement'].some((key) =>
+    valueHasExplicitEmptyAcceptanceCriteria(record[key]),
+  );
+}
+
+function assertAcceptanceCriteriaCaptured(
+  name: string,
+  args: Record<string, unknown>,
+  response: ReplResponse,
+): void {
+  if (!hasSuppliedAcceptanceCriteria(name, args)) return;
+  if (!valueHasExplicitEmptyAcceptanceCriteria(response.payload)) return;
+
+  throw new Error(
+    'requirements_acceptance_criteria_not_captured: acceptanceCriteria was supplied but the mutation response returned an empty acceptanceCriteria list.',
+  );
+}
+
 function normalizeGenerateResponse(response: ReplResponse): ReplResponse {
   const result = (response.payload as { result?: Record<string, unknown> }).result;
   if (!result) return response;
@@ -807,6 +851,7 @@ async function invokeRequirementsTool(
       const normalized = normalizeGenerateResponse(workflowResponse);
       if (hasZipContent(normalized)) return normalized;
     } else {
+      assertAcceptanceCriteriaCaptured(name, args, workflowResponse);
       return workflowResponse;
     }
   }
@@ -822,6 +867,7 @@ async function invokeRequirementsTool(
       const normalized = normalizeGenerateResponse(typedResponse);
       if (!isWikiGenerate(name, args) || hasZipContent(normalized)) return normalized;
     } else {
+      assertAcceptanceCriteriaCaptured(name, args, typedResponse);
       return typedResponse;
     }
   }
