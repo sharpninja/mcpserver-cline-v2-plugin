@@ -58,11 +58,20 @@ describe('memory tool handlers', () => {
       bridge,
     );
 
-    expect(bridge.invoke).toHaveBeenCalledWith('workflow.memory.add', {
+    expect(bridge.invoke).toHaveBeenNthCalledWith(1, 'workflow.memory.add', {
       id: 'MEMORY-REQ-001',
       category: 'REQ',
       text: 'Keep exact wording.',
       scope: 'Workspace',
+    });
+    expect(bridge.invoke).toHaveBeenNthCalledWith(2, 'workflow.sessionlog.appendActions', {
+      actions: [
+        {
+          description: 'Memory add MEMORY-REQ-001',
+          type: 'edit',
+          status: 'completed',
+        },
+      ],
     });
     expect(result).toEqual({ result: { id: 'MEMORY-REQ-001', success: true } });
     expect(fs.readdirSync(failsafeDir)).toEqual([]);

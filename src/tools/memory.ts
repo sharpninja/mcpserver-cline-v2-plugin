@@ -95,6 +95,34 @@ function unwrapRequest(args: Record<string, unknown>): Record<string, unknown> {
   return args;
 }
 
+function memoryMutationDescription(name: string, args: Record<string, unknown>): string {
+  const operation = name.replace(/^memory_/, '');
+  const id = typeof args.id === 'string' && args.id.startsWith('MEMORY-') ? ` ${args.id}` : '';
+  return `Memory ${operation}${id}`;
+}
+
+async function appendMemoryMutationAction(
+  name: string,
+  args: Record<string, unknown>,
+  bridge: ReplBridge,
+): Promise<void> {
+  if (!mutatingMemoryTools.has(name)) return;
+
+  try {
+    await bridge.invoke('workflow.sessionlog.appendActions', {
+      actions: [
+        {
+          description: memoryMutationDescription(name, args),
+          type: 'edit',
+          status: 'completed',
+        },
+      ],
+    });
+  } catch {
+    // Mutation audit is best-effort so absent turn state cannot undo a memory write.
+  }
+}
+
 export async function handleMemoryTool(
   name: string,
   args: Record<string, unknown>,
@@ -120,5 +148,6 @@ export async function handleMemoryTool(
   }
 
   if (failsafePath) await cacheDelete(failsafePath);
+  await appendMemoryMutationAction(name, normalizedArgs, bridge);
   return response.payload;
 }
