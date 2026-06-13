@@ -59,8 +59,9 @@
     "url": "https://github.com/sharpninja/mcpserver-cline-v2-plugin.git"
   },
   "dependencies": {
-    "@cline/core": "0.0.41",
-    "@cline/sdk": "0.0.41",
+    "@cline/core": "^0.0.41",
+    "@cline/sdk": "^0.0.41",
+    "@sharpninja/mcpserver-plugin-core": "file:vendor/sharpninja-mcpserver-plugin-core-0.1.0.tgz",
     "js-yaml": "^4.1.0"
   },
   "peerDependencies": {

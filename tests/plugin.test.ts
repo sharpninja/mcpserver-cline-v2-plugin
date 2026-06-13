@@ -1,5 +1,5 @@
 import defaultPlugin, { allToolDescriptors, createMcpServerPlugin } from '../src/index.js';
-import type { ReplBridge, ReplResponse } from '../src/transport/repl-bridge.js';
+import type { ReplBridge, ReplResponse } from '@sharpninja/mcpserver-plugin-core';
 
 class FakeBridge {
   calls: Array<{ method: string; params?: Record<string, unknown> }> = [];

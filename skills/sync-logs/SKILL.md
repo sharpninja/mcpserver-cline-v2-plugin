@@ -3,7 +3,7 @@ name: sync-logs
 description: Synchronize MCP Server session logs for Cline v2 when asked to "sync logs", "repair MCP session logs", or "logging summary".
 ---
 
-Use the TypeScript bridge tools in `src/transport/repl-bridge.ts` and `src/tools/session*.ts`. Do not use raw REST for normal MCP mutations.
+Use the TypeScript bridge tools from `@sharpninja/mcpserver-plugin-core` (the shared `ReplBridge` transport and `session*` tools, wired in `src/plugin.ts`). Do not use raw REST for normal MCP mutations.
 
 `workflow.*` names below are plugin workflow/REPL method names used by the bridge, not literal Cline v2-visible tool names. Cline v2-visible tools use this plugin's host-facing names, and native `/mcp-transport` tools use names such as `sessionlog_*`, `todo_*`, and `requirements_*`. Do not declare the plugin unavailable solely because generic MCP discovery does not list literal `workflow.*` names.
 
