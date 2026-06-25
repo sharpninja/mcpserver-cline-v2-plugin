@@ -1,9 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 
-const testDir = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(testDir, '..');
+const root = process.cwd();
 const skillPath = path.join(root, 'skills', 'workspace', 'SKILL.md');
 const workflowSkills = ['sync-logs', 'commit-sync', 'wrap-up'] as const;
 
