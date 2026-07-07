@@ -8,5 +8,6 @@ dist/
 !vendor/*.tgz
 
 AGENTS-README-FIRST.yaml
+AGENTS-README-FIRST.yaml.deleted-*
 .mcpServer/
 mcp.db

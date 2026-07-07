@@ -1,6 +1,6 @@
 {
   "name": "@sharpninja/mcpserver-cline-v2-plugin",
-  "version": "1.33.0",
+  "version": "1.34.0",
   "description": "Cline V2 AgentPlugin for McpServer TODO, session-log, requirements, GraphRAG, workspace initialization, and failsafe replay workflows.",
   "type": "module",
   "main": "dist/index.js",
