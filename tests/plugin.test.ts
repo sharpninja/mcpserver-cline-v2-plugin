@@ -70,24 +70,47 @@ describe('Cline V2 AgentPlugin contract', () => {
     const todoQuery = registered.find((tool) => tool.name === 'todo_query');
     if (!todoQuery) throw new Error('todo_query was not registered');
 
-    const result = await todoQuery.execute({ id: 'MCP-TODO-001' }, {});
+    const result = await todoQuery.execute({ keyword: 'MCP-TODO-001' }, {});
 
     expect(result).toEqual({ result: { items: [], totalCount: 0 } });
     expect(result).not.toHaveProperty('content');
     expect(fake.calls).toEqual([
-      { method: 'workflow.todo.query', params: { id: 'MCP-TODO-001' } },
+      { method: 'workflow.todo.query', params: { keyword: 'MCP-TODO-001' } },
     ]);
   });
 
   test('lifecycle hooks open, audit, complete, and close a session without throwing', async () => {
     const { plugin, fake } = setupPlugin();
+    const cyclicToolInput: Record<string, unknown> = { done: false };
+    cyclicToolInput.self = cyclicToolInput;
+    const cyclicToolContext: Record<string, unknown> = {
+      toolCall: { name: 'todo_query', input: cyclicToolInput },
+    };
+    cyclicToolContext.self = cyclicToolContext;
 
     await plugin.hooks?.beforeRun?.({ prompt: 'Implement plugin test', modelId: 'test-model' } as never);
-    await plugin.hooks?.beforeTool?.({ toolCall: { name: 'todo_query', input: { done: false } } } as never);
-    await plugin.hooks?.afterTool?.({ toolCall: { name: 'todo_query', input: { done: false } }, output: { ok: true } } as never);
+    await plugin.hooks?.beforeTool?.(cyclicToolContext as never);
+    await plugin.hooks?.afterTool?.(cyclicToolContext as never);
     await plugin.hooks?.afterRun?.({ result: { output: 'complete' } } as never);
 
     expect(fake.calls.map((call) => call.method)).toContain('client.SessionLog.SubmitAsync');
+    const dialogContents = fake.calls
+      .flatMap((call) => {
+        const turn = call.params?.turn as { processingDialog?: Array<{ content?: string }> } | undefined;
+        const sessionLog = call.params?.sessionLog as
+          | { turns?: Array<{ processingDialog?: Array<{ content?: string }> }> }
+          | undefined;
+        return [
+          ...(turn?.processingDialog ?? []),
+          ...(sessionLog?.turns?.flatMap((item) => item.processingDialog ?? []) ?? []),
+        ];
+      })
+      .map((item) => JSON.parse(item.content ?? '{}'));
+    expect(dialogContents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ tool: 'todo_query', input: { done: false }, status: 'pending' }),
+      expect.objectContaining({ tool: 'todo_query', input: { done: false }, status: 'completed' }),
+    ]));
+    expect(JSON.stringify(dialogContents)).not.toContain('"self"');
     expect(fake.closed).toBe(true);
   });
 });

@@ -35,6 +35,103 @@ type PluginSetup = NonNullable<AgentPlugin['setup']>;
 type PluginSetupApi = Parameters<PluginSetup>[0];
 type PluginSetupContext = Parameters<PluginSetup>[1];
 
+type CoreToolDescriptor = (typeof allToolDescriptors)[number];
+
+function inputRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function copySchemaFields(
+  target: Record<string, unknown>,
+  source: Record<string, unknown> | undefined,
+  propertyNames: string[],
+): void {
+  if (!source) return;
+
+  for (const propertyName of propertyNames) {
+    if (Object.prototype.hasOwnProperty.call(source, propertyName)) {
+      target[propertyName] = source[propertyName];
+    }
+  }
+}
+
+function normalizeToolInput(input: unknown, descriptor: CoreToolDescriptor): Record<string, unknown> {
+  const schema = descriptor.inputSchema as { properties?: Record<string, unknown> };
+  const propertyNames = Object.keys(schema.properties ?? {});
+  if (propertyNames.length === 0) return {};
+
+  const source = inputRecord(input);
+  const normalized: Record<string, unknown> = {};
+  copySchemaFields(normalized, source, propertyNames);
+
+  for (const key of ['input', 'arguments', 'args', 'request']) {
+    copySchemaFields(normalized, inputRecord(source?.[key]), propertyNames);
+  }
+
+  const toolCall = inputRecord(source?.toolCall);
+  copySchemaFields(normalized, inputRecord(toolCall?.input), propertyNames);
+
+  return normalized;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function hasOwn(record: Record<string, unknown> | undefined, propertyName: string): boolean {
+  return !!record && Object.prototype.hasOwnProperty.call(record, propertyName);
+}
+
+function toolNameFromContext(context: unknown, fallback?: string): string {
+  const source = inputRecord(context);
+  const toolCall = inputRecord(source?.toolCall);
+  const tool = inputRecord(source?.tool);
+  return (
+    stringValue(toolCall?.name) ??
+    stringValue(tool?.name) ??
+    stringValue(source?.toolName) ??
+    stringValue(source?.name) ??
+    fallback ??
+    'unknown_tool'
+  );
+}
+
+function rawToolInput(context: unknown, fallback?: unknown): unknown {
+  const source = inputRecord(context);
+  if (hasOwn(source, 'input')) return source?.input;
+
+  const toolCall = inputRecord(source?.toolCall);
+  if (hasOwn(toolCall, 'input')) return toolCall?.input;
+
+  return fallback;
+}
+
+function descriptorByName(name: string): CoreToolDescriptor | undefined {
+  return allToolDescriptors.find((descriptor) => descriptor.name === name);
+}
+
+function sanitizedToolContext(
+  context: unknown,
+  descriptor?: CoreToolDescriptor,
+  fallbackInput?: unknown,
+): Record<string, unknown> {
+  const name = toolNameFromContext(context, descriptor?.name);
+  const matchingDescriptor = descriptor ?? descriptorByName(name);
+  const input = matchingDescriptor
+    ? normalizeToolInput(rawToolInput(context, fallbackInput), matchingDescriptor)
+    : inputRecord(rawToolInput(context, fallbackInput)) ?? {};
+  const sanitized: Record<string, unknown> = { toolCall: { name, input } };
+  const workspacePath = contextWorkspacePath(context);
+  if (workspacePath) sanitized.workspacePath = workspacePath;
+
+  const failure = toolError(context);
+  if (failure) sanitized.error = failure;
+
+  return sanitized;
+}
+
 function logWarn(context: unknown, message: string): void {
   contextLogger(context).warn?.(message);
   process.stderr.write(`${message}\n`);
@@ -71,13 +168,9 @@ export function createMcpServerPlugin(config: McpServerPluginConfig = {}): Agent
             timeoutMs: toolTimeoutMs,
             retryable: false,
             execute: async (input: unknown, toolContext: AgentToolContext) => {
-              await core.bootstrapBestEffort(toolContext);
-              return core.dispatchTool(
-                descriptor.name,
-                (input && typeof input === 'object' && !Array.isArray(input)
-                  ? (input as Record<string, unknown>)
-                  : {}),
-              );
+              const normalizedInput = normalizeToolInput(input, descriptor);
+              await core.bootstrapBestEffort(sanitizedToolContext(toolContext, descriptor, normalizedInput));
+              return core.dispatchTool(descriptor.name, normalizedInput);
             },
           }),
         );
@@ -101,7 +194,7 @@ export function createMcpServerPlugin(config: McpServerPluginConfig = {}): Agent
       },
       beforeTool: async (context: unknown) => {
         try {
-          await core.appendToolAction(context, 'pending');
+          await core.appendToolAction(sanitizedToolContext(context), 'pending');
         } catch (error) {
           process.stderr.write(
             `[mcpserver-cline-v2] beforeTool audit failed: ${
@@ -113,8 +206,9 @@ export function createMcpServerPlugin(config: McpServerPluginConfig = {}): Agent
       },
       afterTool: async (context: unknown) => {
         try {
-          const failure = toolError(context);
-          await core.appendToolAction(context, failure ? 'pending' : 'completed', failure);
+          const auditContext = sanitizedToolContext(context);
+          const failure = toolError(auditContext);
+          await core.appendToolAction(auditContext, failure ? 'pending' : 'completed', failure);
         } catch (error) {
           process.stderr.write(
             `[mcpserver-cline-v2] afterTool audit failed: ${
