@@ -1,3 +1,5 @@
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { createTool, type AgentPlugin, type AgentToolContext } from '@cline/core';
 import {
   createMcpServerPluginCore,
@@ -8,6 +10,13 @@ import {
   type HostContext,
   type ToolResult,
 } from '@sharpninja/mcpserver-plugin-core';
+import {
+  getRequiredMemoryContext,
+  injectRequiredMemoryIntoModelRequest,
+} from './memory-context.js';
+
+const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+process.env.MCP_PLUGIN_HOST = process.env.MCP_PLUGIN_HOST || 'cline-v2';
 
 /**
  * Host glue for the Cline V2 AgentPlugin.
@@ -150,6 +159,29 @@ export function createMcpServerPlugin(config: McpServerPluginConfig = {}): Agent
     toolTimeoutMs,
   });
 
+  let requiredMemoryContext: string | undefined;
+  let requiredMemoryInjected = false;
+
+  async function loadRequiredMemoryContext(context: unknown): Promise<string> {
+    if (requiredMemoryContext !== undefined) return requiredMemoryContext;
+    try {
+      requiredMemoryContext = await getRequiredMemoryContext({
+        pluginRoot,
+        host: 'cline-v2',
+        bridge: core.bridge,
+      });
+    } catch (error) {
+      logWarn(
+        context,
+        `[mcpserver-cline-v2] required-memory fetch failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      requiredMemoryContext = 'REQUIRED MEMORIES - None.';
+    }
+    return requiredMemoryContext;
+  }
+
   const plugin: AgentPlugin = {
     name: 'mcpserver-cline-v2-plugin',
     manifest: {
@@ -178,6 +210,8 @@ export function createMcpServerPlugin(config: McpServerPluginConfig = {}): Agent
     },
     hooks: {
       beforeRun: async (context: unknown) => {
+        requiredMemoryContext = undefined;
+        requiredMemoryInjected = false;
         await core.bootstrapBestEffort(context);
         await core.flushCacheBestEffort(context);
         try {
@@ -186,6 +220,27 @@ export function createMcpServerPlugin(config: McpServerPluginConfig = {}): Agent
           logWarn(
             context,
             `[mcpserver-cline-v2] beforeRun session audit failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
+        await loadRequiredMemoryContext(context);
+        return undefined;
+      },
+      beforeModel: async (context: unknown) => {
+        if (requiredMemoryInjected) return undefined;
+        try {
+          const memoryText = await loadRequiredMemoryContext(context);
+          const injected = injectRequiredMemoryIntoModelRequest(context, memoryText);
+          if (injected) {
+            requiredMemoryInjected = true;
+            return injected;
+          }
+          if (memoryText.trim()) requiredMemoryInjected = true;
+        } catch (error) {
+          logWarn(
+            context,
+            `[mcpserver-cline-v2] beforeModel required-memory inject failed: ${
               error instanceof Error ? error.message : String(error)
             }`,
           );
@@ -219,6 +274,8 @@ export function createMcpServerPlugin(config: McpServerPluginConfig = {}): Agent
         return undefined;
       },
       afterRun: async (context: unknown) => {
+        requiredMemoryContext = undefined;
+        requiredMemoryInjected = false;
         try {
           await core.completeSession(context);
         } catch (error) {
