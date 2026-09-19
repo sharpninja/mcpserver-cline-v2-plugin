@@ -1,5 +1,3 @@
-import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { createTool, type AgentPlugin, type AgentToolContext } from '@cline/core';
 import {
   createMcpServerPluginCore,
@@ -11,11 +9,11 @@ import {
   type ToolResult,
 } from '@sharpninja/mcpserver-plugin-core';
 import {
+  getMemoryPluginRoot,
   getRequiredMemoryContext,
   injectRequiredMemoryIntoModelRequest,
 } from './memory-context.js';
 
-const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 process.env.MCP_PLUGIN_HOST = process.env.MCP_PLUGIN_HOST || 'cline-v2';
 
 /**
@@ -32,6 +30,7 @@ export interface McpServerPluginConfig {
   agentName?: string;
   sessionTitle?: string;
   workspacePath?: string;
+  pluginRoot?: string;
   bridge?: import('@sharpninja/mcpserver-plugin-core').ReplBridge;
   autoBootstrap?: boolean;
   autoFlushCache?: boolean;
@@ -148,6 +147,7 @@ function logWarn(context: unknown, message: string): void {
 
 export function createMcpServerPlugin(config: McpServerPluginConfig = {}): AgentPlugin {
   const toolTimeoutMs = config.toolTimeoutMs ?? 30_000;
+  const pluginRoot = getMemoryPluginRoot(config.pluginRoot);
   const core: HostContext = createMcpServerPluginCore({
     agentName: config.agentName ?? 'Cline',
     pluginId: 'cline-v2',
@@ -234,7 +234,7 @@ export function createMcpServerPlugin(config: McpServerPluginConfig = {}): Agent
           const injected = injectRequiredMemoryIntoModelRequest(context, memoryText);
           if (injected) {
             requiredMemoryInjected = true;
-            return injected;
+            return injected as NonNullable<Awaited<ReturnType<NonNullable<NonNullable<AgentPlugin['hooks']>['beforeModel']>>>>;
           }
           if (memoryText.trim()) requiredMemoryInjected = true;
         } catch (error) {

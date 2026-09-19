@@ -27,6 +27,7 @@ function setupPlugin(fake = new FakeBridge()) {
   const plugin = createMcpServerPlugin({
     bridge: asBridge(fake),
     workspacePath: 'F:\\GitHub\\FeatureFlags',
+    pluginRoot: process.cwd(),
     autoBootstrap: false,
     autoFlushCache: false,
   });

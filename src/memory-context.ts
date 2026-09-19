@@ -422,8 +422,10 @@ export function injectRequiredMemoryIntoModelRequest(
     messages: [
       ...rawMessages,
       {
+        id: `required-memories-${Date.now()}`,
         role: 'user',
         content: [{ type: 'text', text: memoryText }],
+        createdAt: Date.now(),
       },
     ],
   };
