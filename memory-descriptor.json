@@ -1,0 +1,37 @@
+{
+  "host": "cline-v2",
+  "slice": "S7b",
+  "injection": {
+    "requiredMemoriesPrefix": "REQUIRED MEMORIES -",
+    "emptyFallback": "REQUIRED MEMORIES - None."
+  },
+  "fallback": {
+    "localFailsafe": true,
+    "replayAfterAck": true
+  },
+  "tools": [
+    "memory_remember",
+    "memory_recall",
+    "memory_explore",
+    "memory_consolidate",
+    "memory_promote",
+    "memory_revert",
+    "memory_add",
+    "memory_list",
+    "memory_update",
+    "memory_remove"
+  ],
+  "workflowMethods": {
+    "memory_remember": "workflow.memory.remember",
+    "memory_recall": "workflow.memory.recall",
+    "memory_explore": "workflow.memory.explore",
+    "memory_consolidate": "workflow.memory.consolidate",
+    "memory_promote": "workflow.memory.promote",
+    "memory_revert": "workflow.memory.revert",
+    "memory_add": "workflow.memory.add",
+    "memory_list": "workflow.memory.list",
+    "memory_get": "workflow.memory.get",
+    "memory_update": "workflow.memory.update",
+    "memory_remove": "workflow.memory.remove"
+  }
+}

@@ -33,6 +33,7 @@
     "dist/",
     "lib/",
     "skills/",
+    "memory-descriptor.json",
     "ENFORCEMENT.md",
     "README.md"
   ],
