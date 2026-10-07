@@ -1,3 +1,4 @@
+import './qbrain-env.js';
 import { createTool, type AgentPlugin, type AgentToolContext } from '@cline/core';
 import {
   createMcpServerPluginCore,
