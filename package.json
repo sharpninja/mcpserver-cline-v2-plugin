@@ -1,7 +1,7 @@
 {
-  "name": "@sharpninja/mcpserver-cline-v2-plugin",
+  "name": "@qbrainai/qbrain-ai-cline-v2-plugin",
   "version": "1.118.0",
-  "description": "Cline V2 AgentPlugin for McpServer TODO, session-log, requirements, GraphRAG, workspace initialization, and failsafe replay workflows.",
+  "description": "Cline V2 AgentPlugin for QBrain.AI TODO, session-log, requirements, GraphRAG, workspace initialization, and failsafe replay workflows.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -27,7 +27,7 @@
   "scripts": {
     "build": "tsc",
     "test": "jest",
-    "prepublishOnly": "npm run build \u0026\u0026 npm test"
+    "prepublishOnly": "npm run build && npm test"
   },
   "files": [
     "dist/",
@@ -80,6 +80,7 @@
     "typescript": "^5.4.0"
   },
   "engines": {
-    "node": "\u003E=18.0.0"
-  }
+    "node": ">=18.0.0"
+  },
+  "qbrainAiLegacyName": "@sharpninja/mcpserver-cline-v2-plugin"
 }
