@@ -296,4 +296,8 @@ export function createMcpServerPlugin(config: McpServerPluginConfig = {}): Agent
   return plugin;
 }
 
+// TR-MCP-PLUGININT-001 AC-001 (PLAN-SESSIONTRIAGEFIX-001 E3, triage-report-78b6efa1): the QBrain.AI factory name the integration
+// harness loads; createMcpServerPlugin stays exported for existing callers.
+export const createQBrainAiPlugin = createMcpServerPlugin;
+
 export default createMcpServerPlugin();
