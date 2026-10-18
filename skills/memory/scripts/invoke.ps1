@@ -63,18 +63,10 @@ function Resolve-McpMemoryWorkflowMethod {
 $resolvedMethod = Resolve-McpMemoryWorkflowMethod -Requested $requested -DescriptorPath $descriptorPath
 
 if ($env:MCP_PLUGIN_REPL_LOG) {
-    $normalizedParams = if ($ParamsYaml) {
-        ($ParamsYaml -replace "`r`n", "`n" -replace "`r", "`n") -split "`n" | ForEach-Object { "  $_" }
-    } else {
-        @()
+    if (-not (Get-Command Write-McpReplLogEntry -ErrorAction SilentlyContinue)) {
+        . (Join-Path $resolvedPluginRoot 'lib/yaml-object-mutation.ps1')
     }
-    $entry = @(
-        "method: $resolvedMethod"
-        'params: |'
-        $normalizedParams
-        '---'
-    ) -join "`n"
-    Add-Content -LiteralPath $env:MCP_PLUGIN_REPL_LOG -Value $entry
+    Write-McpReplLogEntry -Path $env:MCP_PLUGIN_REPL_LOG -Method $resolvedMethod -ParamsYaml $ParamsYaml
     if ($env:MCP_MEMORY_REPL_RESPONSE) { return $env:MCP_MEMORY_REPL_RESPONSE }
     if ($env:MCP_PLUGIN_REPL_RESPONSE) { return $env:MCP_PLUGIN_REPL_RESPONSE }
     return
