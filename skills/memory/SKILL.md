@@ -14,7 +14,7 @@ Use the Cline v2 plugin memory surface. Do not invent memories. Prefer the plugi
 Cline v2 does not expose Claude-style `UserPromptSubmit`. The always-on request-boundary path is the AgentPlugin hooks in `src/plugin.ts`:
 
 - `beforeRun` loads `memory-descriptor.json` and fetches required memories via `workflow.memory.list` (`scope: Effective`)
-- `beforeModel` injects them into the first model request, including the explicit `None` fallback
+- In governed mode, `beforeModel` injects them into every model request, including after compaction. Only an explicit successful empty list yields `None`. The legacy default adapter injects into the first request only.
 
 Render required memories exactly as:
 
@@ -28,7 +28,7 @@ If no required memories are visible:
 REQUIRED MEMORIES - None.
 ```
 
-Preserve raw memory text. Do not summarize, paraphrase, or add secrets. The request-boundary path is fail-soft: it logs the error and continues with the explicit `None` fallback.
+Preserve raw memory text. Do not summarize, paraphrase, or add secrets. The governed request-boundary path blocks execution when fetching or validating memories fails; it never represents failure as `None`. The legacy default adapter remains fail-soft and logs errors before using its fallback.
 
 ## Fallback
 
