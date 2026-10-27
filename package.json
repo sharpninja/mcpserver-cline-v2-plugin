@@ -9,6 +9,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./host": {
+      "import": "./dist/host.js",
+      "types": "./dist/host.d.ts"
     }
   },
   "cline": {
@@ -25,9 +29,10 @@
     ]
   },
   "scripts": {
-    "build": "tsc",
+    "build": "bun scripts/build.mjs",
     "test": "jest",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "bun run build && bun run test && bun run test:built",
+    "test:built": "node --test tests/built-contract.test.mjs"
   },
   "files": [
     "dist/",
@@ -35,7 +40,11 @@
     "skills/",
     "memory-descriptor.json",
     "ENFORCEMENT.md",
-    "README.md"
+    "README.md",
+    "CORE-MANIFEST.yaml",
+    "vendor/qbrainai-qbrain-ai-plugin-core.tgz",
+    "licenses/",
+    "guidance/"
   ],
   "keywords": [
     "mcp",
@@ -60,27 +69,74 @@
     "url": "https://github.com/sharpninja/mcpserver-cline-v2-plugin.git"
   },
   "dependencies": {
-    "@cline/core": "^0.0.41",
-    "@cline/sdk": "^0.0.41",
-    "@sharpninja/mcpserver-plugin-core": "file:vendor/sharpninja-mcpserver-plugin-core.tgz",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "@qbrainai/qbrain-ai-plugin-core": "file:vendor/qbrainai-qbrain-ai-plugin-core.tgz"
   },
   "peerDependencies": {
-    "@cline/core": "^0.0.41",
-    "@cline/sdk": "^0.0.41"
+    "@cline/core": "0.0.92",
+    "@cline/sdk": "0.0.92"
   },
   "devDependencies": {
-    "@cline/sdk": "0.0.41",
+    "@cline/sdk": "0.0.92",
     "@types/jest": "^29.5.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "@cline/core": "0.0.92"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "qbrainGovernance": {
+    "version": 1,
+    "guidance": [
+      "guidance/governed.md"
+    ],
+    "skills": [
+      {
+        "id": "clear-session",
+        "path": "skills/clear-session/SKILL.md"
+      },
+      {
+        "id": "commit-sync",
+        "path": "skills/commit-sync/SKILL.md"
+      },
+      {
+        "id": "handoff",
+        "path": "skills/handoff/SKILL.md"
+      },
+      {
+        "id": "memory",
+        "path": "skills/memory/SKILL.md"
+      },
+      {
+        "id": "reddit-draft",
+        "path": "skills/reddit-draft/SKILL.md"
+      },
+      {
+        "id": "reddit-publish",
+        "path": "skills/reddit-publish/SKILL.md"
+      },
+      {
+        "id": "sync-logs",
+        "path": "skills/sync-logs/SKILL.md"
+      },
+      {
+        "id": "triage",
+        "path": "skills/triage/SKILL.md"
+      },
+      {
+        "id": "workspace",
+        "path": "skills/workspace/SKILL.md"
+      },
+      {
+        "id": "wrap-up",
+        "path": "skills/wrap-up/SKILL.md"
+      }
+    ]
   },
   "qbrainAiLegacyName": "@sharpninja/mcpserver-cline-v2-plugin"
 }

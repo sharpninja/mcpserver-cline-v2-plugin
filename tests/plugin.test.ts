@@ -1,6 +1,22 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import defaultPlugin, { allToolDescriptors, createMcpServerPlugin } from '../src/index.js';
-import type { ReplBridge, ReplResponse } from '@sharpninja/mcpserver-plugin-core';
+import type { ReplBridge, ReplResponse } from '@qbrainai/qbrain-ai-plugin-core';
 
+// Keep legacy write-ahead fallback files out of the operator's real home/cache.
+let testFailsafeDirectory: string;
+let previousFailsafeDirectory: string | undefined;
+beforeEach(() => {
+  previousFailsafeDirectory = process.env.MCPSERVER_FAILSAFE_DIR;
+  testFailsafeDirectory = mkdtempSync(join(tmpdir(), 'v2-legacy-audit-'));
+  process.env.MCPSERVER_FAILSAFE_DIR = testFailsafeDirectory;
+});
+afterEach(() => {
+  if (previousFailsafeDirectory === undefined) delete process.env.MCPSERVER_FAILSAFE_DIR;
+  else process.env.MCPSERVER_FAILSAFE_DIR = previousFailsafeDirectory;
+  rmSync(testFailsafeDirectory, { recursive: true, force: true });
+});
 class FakeBridge {
   calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
   closed = false;
@@ -31,7 +47,10 @@ function setupPlugin(fake = new FakeBridge()) {
     autoBootstrap: false,
     autoFlushCache: false,
   });
-  const registered: Array<{ name: string; execute: (input: Record<string, unknown>, context?: unknown) => Promise<Record<string, unknown>> }> = [];
+  const registered: Array<{
+    name: string;
+    execute: (input: Record<string, unknown>, context?: unknown) => Promise<Record<string, unknown>>;
+  }> = [];
   const api = {
     registerTool(tool: (typeof registered)[number]) {
       registered.push(tool);
@@ -53,15 +72,17 @@ describe('Cline V2 AgentPlugin contract', () => {
     const names = registered.map((tool) => tool.name);
 
     expect(names).toHaveLength(allToolDescriptors.length);
-    expect(names).toEqual(expect.arrayContaining([
-      'workspace_ensure',
-      'todo_query',
-      'todo_internal_status',
-      'todo_internal_enable',
-      'session_query_history',
-      'req_generate_document',
-      'graphrag_query',
-    ]));
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'workspace_ensure',
+        'todo_query',
+        'todo_internal_status',
+        'todo_internal_enable',
+        'session_query_history',
+        'req_generate_document',
+        'graphrag_query',
+      ]),
+    );
   });
 
   test('tool execution returns plain JSON and routes through the retained workflow method', async () => {
@@ -78,9 +99,7 @@ describe('Cline V2 AgentPlugin contract', () => {
 
     expect(result).toEqual({ result: { items: [], totalCount: 0 } });
     expect(result).not.toHaveProperty('content');
-    expect(fake.calls).toEqual([
-      { method: 'workflow.todo.query', params: { keyword: 'MCP-TODO-001' } },
-    ]);
+    expect(fake.calls).toEqual([{ method: 'workflow.todo.query', params: { keyword: 'MCP-TODO-001' } }]);
   });
 
   test('lifecycle hooks open, audit, complete, and close a session without throwing', async () => {
@@ -110,10 +129,12 @@ describe('Cline V2 AgentPlugin contract', () => {
         ];
       })
       .map((item) => JSON.parse(item.content ?? '{}'));
-    expect(dialogContents).toEqual(expect.arrayContaining([
-      expect.objectContaining({ tool: 'todo_query', input: { done: false }, status: 'pending' }),
-      expect.objectContaining({ tool: 'todo_query', input: { done: false }, status: 'completed' }),
-    ]));
+    expect(dialogContents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ tool: 'todo_query', input: { done: false }, status: 'pending' }),
+        expect.objectContaining({ tool: 'todo_query', input: { done: false }, status: 'completed' }),
+      ]),
+    );
     expect(JSON.stringify(dialogContents)).not.toContain('"self"');
     expect(fake.closed).toBe(true);
   });
@@ -127,14 +148,14 @@ describe('Cline V2 AgentPlugin contract', () => {
     const { plugin } = setupPlugin(fake);
 
     await plugin.hooks?.beforeRun?.({ prompt: 'Implement plugin test', modelId: 'test-model' } as never);
-    expect(fake.calls).toEqual(expect.arrayContaining([
-      { method: 'workflow.memory.list', params: { scope: 'Effective' } },
-    ]));
+    expect(fake.calls).toEqual(
+      expect.arrayContaining([{ method: 'workflow.memory.list', params: { scope: 'Effective' } }]),
+    );
 
-    const first = await plugin.hooks?.beforeModel?.({
+    const first = (await plugin.hooks?.beforeModel?.({
       snapshot: { iteration: 0 },
       request: { messages: [{ role: 'user', content: [{ type: 'text', text: 'Implement plugin test' }] }] },
-    } as never) as { messages?: Array<{ content?: unknown }> } | undefined;
+    } as never)) as { messages?: Array<{ content?: unknown }> } | undefined;
     expect(JSON.stringify(first?.messages)).toContain('REQUIRED MEMORIES - MEMORY-REQ-001: Raw memory text.');
 
     const second = await plugin.hooks?.beforeModel?.({
@@ -150,9 +171,9 @@ describe('Cline V2 AgentPlugin contract', () => {
     const { plugin } = setupPlugin(fake);
 
     await expect(plugin.hooks?.beforeRun?.({ prompt: 'still work' } as never)).resolves.toBeUndefined();
-    const injected = await plugin.hooks?.beforeModel?.({
+    const injected = (await plugin.hooks?.beforeModel?.({
       request: { messages: [{ role: 'user', content: 'still work' }] },
-    } as never) as { messages?: unknown[] } | undefined;
+    } as never)) as { messages?: unknown[] } | undefined;
     expect(JSON.stringify(injected?.messages)).toContain('REQUIRED MEMORIES - None.');
   });
 });

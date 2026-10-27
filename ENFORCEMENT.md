@@ -1,117 +1,41 @@
-# Per-Turn Enforcement Protocol (Cline v2) - v4 Shared Protocol
+# Enforcement surfaces in Cline V2
 
-This plugin implements the McpServer **v4 Shared Enforcement Protocol** for Cline v2 agent sessions.
-See `packages/mcpserver-agent-core` (`@sharpninja/mcpserver-agent-core`) for the shared core reference.
+This package exports an AgentPlugin factory. It is not itself an MCP server and does not ship the old user-prompt-submit.sh, code-verify.sh or stop-gate.sh scripts described in the former document.
 
-Cline consumes this plugin as an MCP server. The server does not (and cannot)
-intercept Cline's message loop — Cline decides when to call MCP tools. This
-document specifies the Per-User-Message contract that the Cline **agent** must
-follow, plus the helper scripts in `lib/` that automate the bookkeeping.
+## Governed adapter
 
-## Why this is required
+Trusted product hosts explicitly construct the governed adapter with its verified installation, exact signed artifact binding, bound workspace/fetch and reviewed REPL transport. The adapter validates required assets before bootstrap; startup verifies trust, replays cache, starts session handling, obtains required memories and effective requirements, and only then permits model/tool execution. Failures propagate to the host. Canonical A8/S6 integration remains required before production acceptance.
 
-`AGENTS-README-FIRST.yaml` in every MCP-enabled workspace mandates:
+package.json declares the exact guidance assets and complete skill inventory under qbrainGovernance. Startup loads each skill into an immutable snapshot and exposes qbrain_skill_read. The tool accepts only an exact declared skill ID and returns captured text, never executes it. Unrelated workflows remain inactive until their documented triggers and operator authorization apply.
 
-- **Rule 2**: Post a new session log turn before starting work on each user
-  message.
-- **Rule 10**: Do not ship code you have not verified compiles.
-- **Before Delivering Output**: Session log must be current, decisions
-  recorded, code compiles.
+Every model request receives declared guidance, the required skill catalogue, the required-memory block and the complete effective requirement result. Missing files, inventory mismatch, malformed metadata or failed guidance queries block startup. A successful empty memory query is distinct from failure. Marker credentials, marker prompt and bootstrap instructions are not model guidance.
 
-These rules have no hook-based enforcement in Cline (unlike Claude Code or
-Copilot CLI). Compliance is agent-driven.
+The adapter propagates audit and completion failures. Mandatory final tool authorization, protected registration, completion evidence and all-host construction are separate host integration obligations; an optional hook or afterRun callback alone is not enforcement. The product must also authenticate installed bytes before import. No test of this adapter alone closes those host obligations.
 
-## Tool Name Surfaces
+## Required in-process host binding
 
-Cline v2-visible tools use this plugin's host-facing `createTool` names. The
-helper scripts still call `workflow.sessionlog.*`, `workflow.todo.*`, and
-`workflow.requirements.*` through the plugin workflow/REPL shim. Those
-`workflow.*` names are not literal native McpServer MCP tool names. Native
-McpServer `/mcp-transport` discovery uses names such as `sessionlog_*`,
-`todo_*`, and `requirements_*`; hosted-agent adapters may expose aliases such as
-`mcp_session_*`.
+`createGovernedMcpServerHost(config)` forces governed mode and returns an immutable
+`requiredTools` inventory, lifecycle `hooks`, and `getRequiredModelContext()`.
+It does not register through optional plugin discovery. The model context method
+refuses calls before successful startup or after the run ends; while ready, it
+returns full required guidance and fresh copies of trusted tool definitions.
+The returned hooks intentionally omit `beforeModel`: the product must compose
+the context at its final model-request gate, after optional hooks and compaction.
 
-Do not search generic MCP discovery for literal `workflow.*` names and call the
-plugin unavailable solely because those names are absent. Validate Cline v2
-plugin registration, host-facing tools, and helper scripts separately.
+The cline-qb private `createRequiredModelGate` appends this guidance after the
+final custom system prompt and restores required advertised tool definitions.
+The SDK's separate `requiredTools` registration protects local implementations.
+These are distinct obligations: registration alone does not restore advertised
+tools, and a model gate alone does not protect registered implementations.
+The packed-artifact contract runs against the modified workspace SDK and tests
+both together. Published peer version equality alone does not prove these host
+capabilities. Durable audit integration, final tool policy, provider-internal
+capability admission and shipped host factories remain required before release.
 
-## The Three Scripts
+## Legacy adapter
 
-The plugin ships three bash scripts in `lib/` that Cline agents should invoke
-per user message:
+The default export and factory without governed: true retain compatibility behavior, including best-effort bootstrap/audit and first-request memory injection. They are not eligible construction paths for shipped governed applications.
 
-### Phase 1 — On user message receipt
+## Workflow names
 
-```bash
-echo '{"prompt":"<verbatim user message>"}' | bash ${CLINE_PLUGIN_ROOT}/lib/user-prompt-submit.sh
-```
-
-What it does:
-- Reads the active `sessionId` from `cache/session-state.yaml`
-- Builds a fresh `req-<yyyyMMddTHHmmssZ>-prompt-xxxx` requestId
-- Invokes `workflow.sessionlog.beginTurn` via `mcpserver-repl`
-- Writes `cache/current-turn.yaml` so Phase 3 can verify completion
-
-Alternatively, Cline agents can call the MCP tool `session_begin_turn`
-directly — but the script also seeds `current-turn.yaml` which the Stop gate
-relies on. **Prefer the script.**
-
-### Phase 2 — After every code edit
-
-```bash
-echo '{"tool_name":"Edit","tool_input":{"file_path":"<absolute path>"}}' \
-  | bash ${CLINE_PLUGIN_ROOT}/lib/code-verify.sh
-```
-
-Runs `dotnet build` (for .NET files) or `tsc --noEmit` (for TypeScript)
-against the containing project. Updates `cache/current-turn.yaml` with
-`lastBuildStatus` and increments `codeEdits`. Appends a session log action
-via `workflow.sessionlog.appendActions`.
-
-If the build fails, stdout contains build errors. The agent should fix them
-before the next phase.
-
-### Phase 3 — Before final response
-
-```bash
-bash ${CLINE_PLUGIN_ROOT}/lib/stop-gate.sh
-```
-
-Returns `decision: block` with reason if:
-- Turn is still `in_progress` → agent forgot `workflow.sessionlog.completeTurn`
-- `lastBuildStatus: failed` → build is broken
-
-When blocked, fulfill the missing requirement. Call the MCP tool
-`session_complete_turn` with a response summary, or fix the build, then
-re-run `stop-gate.sh`.
-
-## Why scripts and not MCP tools?
-
-The scripts coordinate shared state (`cache/current-turn.yaml`) that needs
-to persist across MCP tool invocations. They can also run `dotnet build` /
-`tsc` which are not surfaced as MCP tools. A future version may expose
-equivalent MCP tools (`enforce_begin_turn`, `enforce_verify_build`,
-`enforce_stop_gate`) that wrap these scripts; until then, invoke via shell.
-
-## Integration hint for Cline prompts
-
-Add to the agent's system prompt or task instructions:
-
-```
-Before calling any other tool on a new user message, run
-  echo '{"prompt":"..."}' | bash $CLINE_PLUGIN_ROOT/lib/user-prompt-submit.sh
-
-After editing any .cs/.axaml/.ts/.tsx file, run
-  echo '{"tool_name":"Edit","tool_input":{"file_path":"..."}}' | bash $CLINE_PLUGIN_ROOT/lib/code-verify.sh
-
-Before emitting your final response, run
-  bash $CLINE_PLUGIN_ROOT/lib/stop-gate.sh
-```
-
-## See also
-
-- `F:\GitHub\mcpserver-marketplace\plugins\mcpserver\hooks\hooks.json` —
-  reference hook configuration for the Claude Code plugin where these
-  scripts run as automated hooks (`UserPromptSubmit`, `PostToolUse`, `Stop`).
-- `AGENTS-README-FIRST.yaml` in each workspace — authoritative contract
-  these scripts implement.
+Host tools such as session_begin_turn and req_effective route through the supported plugin workflow/REPL surface. workflow.sessionlog.*, workflow.requirements.* and workflow.memory.* are workflow method names, distinct from native MCP discovery names. Use the registered tools or supported wrappers, not raw REST or direct edits to session/cache files.

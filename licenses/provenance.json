@@ -1,0 +1,30 @@
+{
+  "license": "Apache-2.0",
+  "scope": "This inventory document only; included source licenses remain separate",
+  "sources": [
+    {
+      "name": "@sharpninja/mcpserver-cline-v2-plugin",
+      "version": "1.118.0",
+      "baseline": "9aa504f576bd742ecbf3c684136449ea74b46814",
+      "packageLicense": "MIT",
+      "licenseFile": "No LICENSE file exists in the baseline source",
+      "newSources": "SPDX Apache-2.0 on scripts/build.mjs, src/governed-memory.ts, src/required-guidance.ts, tests/required-guidance.test.ts, tests/governed-memory.test.ts, tests/governed-plugin.test.ts and tests/built-contract.test.mjs; src/host.ts and src/plugin-state.ts are new Apache-2.0 files. plugin-state.ts factors existing adapter logic from src/plugin.ts; retained project/package declarations are unchanged."
+    },
+    {
+      "name": "@qbrainai/qbrain-ai-plugin-core",
+      "version": "0.2.0",
+      "baseline": "f56dcf70e7e84f2d286e1ca9e0e6680133f09a82",
+      "packageLicense": "MIT",
+      "projectLicenseFile": "McpServer-LICENSE.txt",
+      "sourceLicenses": "Mixed: preserve existing declarations and new SPDX Apache-2.0",
+      "vendorSha256": "BB9CBDE37B9E7F4EC1F4C7E52A3706BCDB8926FB3825F6BDE1CE32945D63BF1D"
+    },
+    {
+      "name": "js-yaml",
+      "version": "4.2.0",
+      "packageLicense": "MIT",
+      "licenseFile": "js-yaml-LICENSE.txt"
+    }
+  ],
+  "releaseProvenanceComplete": false
+}

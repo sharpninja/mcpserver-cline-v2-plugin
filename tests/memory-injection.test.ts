@@ -130,11 +130,13 @@ payload:
 
   test('parses JSON, YAML, and line-oriented memory items', () => {
     expect(
-      convertToMemoryItems({ payload: { result: { items: [{ id: 'MEMORY-REQ-002', text: 'From object.' }] } } }),
+      convertToMemoryItems({
+        payload: { result: { items: [{ id: 'MEMORY-REQ-002', text: 'From object.' }] } },
+      }),
     ).toEqual([{ id: 'MEMORY-REQ-002', text: 'From object.' }]);
-    expect(
-      convertToMemoryItems('id: MEMORY-REQ-003\ntext: From lines.'),
-    ).toEqual([{ id: 'MEMORY-REQ-003', text: 'From lines.' }]);
+    expect(convertToMemoryItems('id: MEMORY-REQ-003\ntext: From lines.')).toEqual([
+      { id: 'MEMORY-REQ-003', text: 'From lines.' },
+    ]);
     expect(convertToMemoryItems('')).toEqual([]);
   });
 
@@ -155,7 +157,10 @@ payload:
   });
 
   test('beforeModel helper injects once into the first model request', () => {
-    const parts = mergeRequiredMemoryIntoParts([{ type: 'text', text: 'user prompt' }], 'REQUIRED MEMORIES - None.');
+    const parts = mergeRequiredMemoryIntoParts(
+      [{ type: 'text', text: 'user prompt' }],
+      'REQUIRED MEMORIES - None.',
+    );
     expect(parts).toEqual([
       { type: 'text', text: 'user prompt' },
       { type: 'text', text: 'REQUIRED MEMORIES - None.' },
@@ -190,8 +195,8 @@ payload:
     }
   });
 
-  test('src/plugin.ts wires beforeRun fetch and beforeModel inject', () => {
-    const pluginSource = fs.readFileSync(path.join(root, 'src', 'plugin.ts'), 'utf8');
+  test('plugin state wires beforeRun fetch and beforeModel inject', () => {
+    const pluginSource = fs.readFileSync(path.join(root, 'src', 'plugin-state.ts'), 'utf8');
     const helperSource = fs.readFileSync(path.join(root, 'src', 'memory-context.ts'), 'utf8');
     expect(pluginSource).toContain('getRequiredMemoryContext');
     expect(pluginSource).toContain('injectRequiredMemoryIntoModelRequest');
