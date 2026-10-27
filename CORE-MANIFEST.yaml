@@ -1,5 +1,5 @@
 coreVersion: 8768de8a
-syncedAtUtc: 2026-10-19T20:52:39Z
+syncedAtUtc: 2026-10-27T21:14:10Z
 files:
   lib/agent-runtime-header.ps1: 9ab9f1483e8650aaf65372ea26a5cc9c610b4a7a3c5903912017755ebbbce5d3
   lib/cache-manager.ps1: 3919da33e9bf445ec0b118ac81e163c22180820d647f8f01a73fd6eaaa07073c
@@ -11,9 +11,9 @@ files:
   lib/mcp-status.ps1: a43705c70d4d079ef78a5a19f5e1c192fd47910b781525f0beccf129df37ac52
   lib/McpPluginShim.psm1: 4a399ff1c043bcea0a2483222afd421a960c9639020302b7cca8027e0450e4f1
   lib/plan-todo-map.ps1: e2a54ae0967b20689045cd3a227a8bce8e980ef3b26ea1e37678a8600c9bf288
-  lib/plugin-env.ps1: f10d87095328c10ae003aba3ad4ea8c6ed825da53a788e22d4aac8c058e2fc2b
+  lib/plugin-env.ps1: ba16101e59c136d950bd4d4d6a663b036865c890e160581bb6be0e83c82dc14f
   lib/plugin-hook.ps1: 47900a78e75bf811e58a39b6d9f9fb81d7a36023fd8b55c49eeca1e1103d1eed
-  lib/repl-invoke.ps1: 93ae956eeecb13d2561621a69c88d86a1cde32026f81445761d75536ba4ee90e
+  lib/repl-invoke.ps1: 5d2f28318d4716b48d0f4d4c9ca086b6ff754b1479a7fdd3a6510505ed3ec527
   lib/repl-params-transfer.ps1: 5eece7229c3af13d848ac1e50f3b40580fe51313a52cbe89b53ab2c35f4142e9
   lib/resolve-cache-dir.ps1: f78e997c6190d57a674dfd8a476ddf009981d4edf337c2a87559f6acd8df900e
   lib/yaml-object-mutation.ps1: 7db7e49c06fb78babc1c68b343a776d7fda3c9c8ae4c48fe3292d9c4daee6ca7

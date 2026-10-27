@@ -717,7 +717,9 @@ function Invoke-ReplRawCore {
         $replCommand = Get-Command mcpserver-repl -ErrorAction SilentlyContinue
     }
     $replExe = $null
-    if ($env:MCP_REPL_EXECUTABLE -and (Test-Path -LiteralPath $env:MCP_REPL_EXECUTABLE)) {
+    if ($env:QBRAINAI_REPL_EXECUTABLE -and (Test-Path -LiteralPath $env:QBRAINAI_REPL_EXECUTABLE)) {
+        $replExe = $env:QBRAINAI_REPL_EXECUTABLE
+    } elseif ($env:MCP_REPL_EXECUTABLE -and (Test-Path -LiteralPath $env:MCP_REPL_EXECUTABLE)) {
         $replExe = $env:MCP_REPL_EXECUTABLE
     } elseif ($replCommand) {
         $replExe = [string]$replCommand.Source
